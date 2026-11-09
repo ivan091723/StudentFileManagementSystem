@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student File Management System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        darkBg: '#090d14',
+                        cardDark: '#121824',
+                        cardHover: '#1a2234',
+                        accentOrange: '#f59e0b',
+                        accentOrangeHover: '#d97706',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #090d14;
+            background-image: 
+                radial-gradient(circle at 18% 50%, rgba(245, 158, 11, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.04) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121824;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #273449;
+            border-radius: 4px;
+        }
+        .node-connector::after {
+            content: '➔';
+            position: absolute;
+            right: -18px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: #64748b;
+            font-weight: bold;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+        .animate-shake {
+            animation: shake 0.35s ease-in-out;
+        }
+        .glow-effect {
+            box-shadow: 0 0 35px -5px rgba(245, 158, 11, 0.15);
+        }
+
+        .ambient-glow {
+            position: absolute;
+            top: 100px; left: -50px;
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(247,160,50,0.4) 0%, rgba(247,160,50,0) 70%);
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 0;
+        }
+        body[data-on="true"] .ambient-glow { opacity: 1; }
+
+        #dustCanvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body data-on="false" data-color="amber" class="bg-darkBg text-slate-200 min-h-screen font-sans flex flex-col justify-between">
+
+    <canvas id="dustCanvas"></canvas>
+
+    <!-- Toast notifications -->
+    <div id="toastBox" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+    <div id="loginModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+
+        <div class="flex flex-col lg:flex-row items-center justify-center max-w-5xl w-full gap-12 lg:gap-20 z-10">
+
+            <div class="lamp-stage relative w-80 h-[400px] hidden lg:flex items-center justify-center flex-shrink-0">
+                <div class="ambient-glow"></div>
+                <svg id="lampSVG" class="w-full h-full relative z-10" viewBox="0 0 320 400">
+
+                    <ellipse cx="160" cy="380" rx="70" ry="15" fill="#111" />
+                    <ellipse cx="160" cy="378" rx="60" ry="8" fill="#f7a032" />
+
+                    <path d="M160,375 L160,280 C160,260 140,240 120,220 L80,180" stroke="#1a1d24" stroke-width="8" fill="none" />
+                    <path d="M80,180 C70,170 90,150 100,160 L140,200 C160,220 180,240 180,260 L180,375" stroke="#1a1d24" stroke-width="8" fill="none" />
+
+                    <g id="shadeAssembly">
+                        <line x1="80" y1="180" x2="160" y2="140" stroke="#1a1d24" stroke-width="6" />
+                        <circle cx="80" cy="180" r="10" fill="#f7a032" />
+                        <circle cx="80" cy="180" r="5" fill="#111" />
+
+                        <path d="M160,140 C140,140 110,160 110,200 L210,200 C210,160 180,140 160,140 Z" fill="#1a1d24" />
+                        <ellipse cx="160" cy="200" rx="50" ry="10" fill="#333" />
+                        <ellipse cx="160" cy="200" rx="40" ry="6" fill="#f7a032" opacity="0" class="bulb-glow-core" />
+
+                        <path d="M155,200 Q160,190 165,200" stroke="#555" stroke-width="2" fill="none" class="bulb-filament" />
+                    </g>
+
+                    <path id="elasticCord" d="M160,190 Q160,240 160,290" stroke="#9ca3af" stroke-width="2" fill="none" />
+                    <circle id="cordBead" cx="160" cy="290" r="8" fill="#e5e7eb" style="cursor: grab;" />
+                    <circle id="cordHit" cx="160" cy="290" r="25" fill="transparent" style="cursor: pointer;" />
+                </svg>
+            </div>
+
+            <div id="loginCard" class="bg-cardDark border border-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-8 glow-effect relative overflow-hidden flex-shrink-0 opacity-0 translate-y-8 pointer-events-none transition-all duration-300">
+
+                <div class="flex bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/80 mb-6">
+                    <button type="button" class="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-800 text-white shadow-sm transition">Sign In</button>
+                    <button type="button" onclick="toggleAuthView('register')" class="flex-1 py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition">Sign Up</button>
+                </div>
+
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-white">Welcome</h2>
+                    <p class="text-xs text-slate-400 mt-1">Hilahin ang tali ng lampara para buksan ito at mag-sign in</p>
+                </div>
+
+                <div id="loginError" class="hidden mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span id="loginErrorMsg">Invalid credentials. Access Denied.</span>
+                </div>
+
+                <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Username or Email</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                                <i class="fa-solid fa-user text-xs"></i>
+                            </span>
+                            <input type="text" id="usernameInput" autocomplete="username" placeholder="Enter username" required
+                                oninput="hideLoginError()"
+                                class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-xl focus:bg-slate-900 focus:outline-none focus:border-amber-500 text-sm text-white placeholder-slate-600 transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block text-xs font-medium text-slate-400">Password / PIN</label>
+                            <a href="#" onclick="alert('Please contact your system administrator to reset your password.'); return false;" class="text-[11px] text-amber-500 hover:underline">Forgot?</a>
+                        </div>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                                <i class="fa-solid fa-lock text-xs"></i>
+                            </span>
+                            <input type="password" id="pinInput" autocomplete="current-password" placeholder="••••" maxlength="4" required
+                                oninput="hideLoginError()"
+                                class="w-full pl-10 pr-10 py-3 bg-slate-900/90 border border-slate-800 rounded-xl focus:bg-slate-900 focus:outline-none focus:border-amber-500 text-sm text-white placeholder-slate-600 tracking-widest font-mono transition">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs py-1">
+                        <label class="flex items-center gap-2 cursor-pointer text-slate-400">
+                            <input type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0">
+                            <span>Remember me</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" 
+                        class="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/20 transition transform active:scale-[0.99] flex items-center justify-center gap-2 text-sm mt-2">
+                        Sign In <i class="fa-solid fa-arrow-right text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="registerModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-cardDark border border-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-8 glow-effect relative overflow-hidden flex-shrink-0">
+            <div class="flex bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/80 mb-6">
+                <button type="button" onclick="toggleAuthView('login')" class="flex-1 py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition">Sign In</button>
+                <button type="button" class="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-800 text-white shadow-sm transition">Sign Up</button>
+            </div>
+
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-white">Create Account</h2>
+                <p class="text-xs text-slate-400 mt-1">Register new system credentials</p>
+            </div>
+
+            <div id="registerError" class="hidden mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="registerErrorMsg">Registration error.</span>
+            </div>
+
+            <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">New Username</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                            <i class="fa-solid fa-user text-xs"></i>
+                        </span>
+                        <input type="text" id="regUsername" autocomplete="off" placeholder="Choose username" required
+                            class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-xl focus:bg-slate-900 focus:outline-none focus:border-amber-500 text-sm text-white placeholder-slate-600 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                            <i class="fa-solid fa-envelope text-xs"></i>
+                        </span>
+                        <input type="email" id="regEmail" autocomplete="off" placeholder="you@example.com" required
+                            class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-xl focus:bg-slate-900 focus:outline-none focus:border-amber-500 text-sm text-white placeholder-slate-600 transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">4-Digit PIN / Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                            <i class="fa-solid fa-key text-xs"></i>
+                        </span>
+                        <input type="password" id="regPin" autocomplete="new-password" placeholder="4-digit PIN" maxlength="4" required
+                            class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-800 rounded-xl focus:bg-slate-900 focus:outline-none focus:border-amber-500 text-sm text-white placeholder-slate-600 tracking-widest font-mono transition">
+                    </div>
+                </div>
+
+                <button type="submit" 
+                    class="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/20 transition transform active:scale-[0.99] flex items-center justify-center gap-2 text-sm mt-2">
+                    <i class="fa-solid fa-check-circle"></i> Register Account
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="mainDashboard" class="hidden min-h-screen flex flex-col">
+
+        <header class="bg-cardDark border-b border-slate-800 text-white shadow-xl">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <span class="px-2.5 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg text-xs font-mono font-semibold">DATA STRUCTURES FINAL PROJECT</span>
+                            <span class="text-xs text-slate-400">Singly Linked List + Stack</span>
+                        </div>
+                        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 text-white">
+                            Student File Management System
+                        </h1>
+                    </div>
+
+                    <div class="flex items-center gap-2.5">
+                        <span id="roleBadge" class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono font-semibold"></span>
+                        <button onclick="exportCSV()" class="admin-only px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-file-csv text-emerald-400"></i> Export CSV
+                        </button>
+                        <button onclick="exportJSON()" class="admin-only px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-download text-amber-400"></i> Export JSON
+                        </button>
+                        <button onclick="handleLogout()" class="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-medium transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-right-from-bracket"></i> Logout
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+                    <nav class="flex flex-wrap gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-medium">
+                        <button onclick="switchTab('dashboard')" id="tabBtn-dashboard" class="px-4 py-2 rounded-lg text-slate-950 bg-amber-500 font-semibold transition flex items-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-chart-pie"></i> Dashboard Overview
+                        </button>
+                        <button onclick="switchTab('records')" id="tabBtn-records" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-address-book"></i> Student Records & CRUD
+                        </button>
+                        <button onclick="switchTab('approvals')" id="tabBtn-approvals" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-user-check"></i> Pending Approvals
+                            <span id="pendingBadge" class="hidden px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold leading-none">0</span>
+                        </button>
+                        <button onclick="switchTab('visualizers')" id="tabBtn-visualizers" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-diagram-project"></i> Data Structures Visualizer
+                        </button>
+                        <button onclick="switchTab('logs')" id="tabBtn-logs" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-list-check"></i> Activity History Stack
+                        </button>
+                        <button onclick="switchTab('accounts')" id="tabBtn-accounts" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2">
+                            <i class="fa-solid fa-user-gear"></i> Manage Accounts
+                        </button>
+                    </nav>
+
+                    <button onclick="openCreators()" class="px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-users"></i> Meet the Creators
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow w-full">
+
+            <div id="tabContent-dashboard" class="space-y-8 animate-fade-in">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-cardDark rounded-2xl p-6 shadow-sm border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Enrolled</p>
+                            <h3 id="dashTotalStudents" class="text-3xl font-extrabold text-white mt-1">0</h3>
+                            <p class="text-[11px] text-emerald-400 font-medium mt-1"><i class="fa-solid fa-circle-check"></i> Approved Records in Database</p>
+                        </div>
+                        <div class="w-12 h-12 bg-slate-900 text-amber-500 border border-slate-800 rounded-2xl flex items-center justify-center text-xl shadow-inner">
+                            <i class="fa-solid fa-users-viewfinder"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-cardDark rounded-2xl p-6 shadow-sm border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Average System GPA</p>
+                            <h3 id="dashAvgGPA" class="text-3xl font-extrabold text-white mt-1">0.00</h3>
+                            <p class="text-[11px] text-slate-400 font-medium mt-1">Scale: 1.00 (Highest) - 5.00</p>
+                        </div>
+                        <div class="w-12 h-12 bg-slate-900 text-emerald-400 border border-slate-800 rounded-2xl flex items-center justify-center text-xl shadow-inner">
+                            <i class="fa-solid fa-graduation-cap"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-cardDark rounded-2xl p-6 shadow-sm border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Honors (GPA &le; 1.75)</p>
+                            <h3 id="dashHonorStudents" class="text-3xl font-extrabold text-emerald-400 mt-1">0</h3>
+                            <p class="text-[11px] text-emerald-400 font-medium mt-1"><i class="fa-solid fa-award"></i> Dean's & President's List</p>
+                        </div>
+                        <div class="w-12 h-12 bg-slate-900 text-emerald-400 border border-slate-800 rounded-2xl flex items-center justify-center text-xl shadow-inner">
+                            <i class="fa-solid fa-medal"></i>
+                        </div>
+                    </div>
+
+                    <div class="bg-cardDark rounded-2xl p-6 shadow-sm border border-slate-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Programs Represented</p>
+                            <h3 id="dashTotalCourses" class="text-3xl font-extrabold text-amber-500 mt-1">0</h3>
+                            <p class="text-[11px] text-amber-500 font-medium mt-1"><i class="fa-solid fa-book-bookmark"></i> Academic Courses</p>
+                        </div>
+                        <div class="w-12 h-12 bg-slate-900 text-amber-500 border border-slate-800 rounded-2xl flex items-center justify-center text-xl shadow-inner">
+                            <i class="fa-solid fa-cubes"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div class="lg:col-span-6 bg-cardDark p-6 rounded-2xl shadow-sm border border-slate-800">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-column text-amber-500"></i> Course Enrollment Breakdown
+                            </h3>
+                            <span class="text-[11px] text-slate-400 font-mono">Dynamic Real-time</span>
+                        </div>
+                        <div class="h-64 relative flex items-center justify-center">
+                            <canvas id="courseChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-6 bg-cardDark p-6 rounded-2xl shadow-sm border border-slate-800">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-chart-pie text-emerald-400"></i> Academic Standing Distribution
+                            </h3>
+                            <span class="text-[11px] text-slate-400 font-mono">GPA Ratings</span>
+                        </div>
+                        <div class="h-64 relative flex items-center justify-center">
+                            <canvas id="gpaChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div class="lg:col-span-4 bg-cardDark p-6 rounded-2xl shadow-sm border border-slate-800 flex flex-col justify-between space-y-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-white mb-1 flex items-center gap-2">
+                                <i class="fa-solid fa-bolt text-amber-500"></i> Quick Actions
+                            </h3>
+                            <p class="text-xs text-slate-400">Shortcuts to manage system records.</p>
+                        </div>
+                        <div class="space-y-2.5">
+                            <button onclick="switchTab('records'); focusAddForm();" class="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-amber-400 font-semibold rounded-xl text-xs border border-slate-800 transition flex items-center justify-between">
+                                <span><i class="fa-solid fa-plus-circle"></i> Add New Student</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+                            <button onclick="switchTab('records'); focusSearch();" class="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold rounded-xl text-xs border border-slate-800 transition flex items-center justify-between">
+                                <span><i class="fa-solid fa-magnifying-glass"></i> Search Directory</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+                            <button onclick="switchTab('approvals')" class="admin-only w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-emerald-400 font-semibold rounded-xl text-xs border border-slate-800 transition flex items-center justify-between">
+                                <span><i class="fa-solid fa-user-check"></i> Review Pending Students</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+                            <button onclick="switchTab('visualizers')" class="admin-only w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-purple-400 font-semibold rounded-xl text-xs border border-slate-800 transition flex items-center justify-between">
+                                <span><i class="fa-solid fa-diagram-project"></i> View Linked List Diagram</span>
+                                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-8 bg-cardDark p-6 rounded-2xl shadow-sm border border-slate-800">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-clock-rotate-left text-purple-400"></i> Recent Activity Stream
+                            </h3>
+                            <button onclick="switchTab('logs')" class="admin-only text-xs text-amber-400 hover:underline font-medium">View All Logs</button>
+                        </div>
+                        <div id="dashRecentLogs" class="space-y-2">
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tabContent-records" class="hidden space-y-8 animate-fade-in">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                    <section class="lg:col-span-4 bg-cardDark rounded-2xl shadow-sm border border-slate-800 p-6 flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-user-plus text-amber-500"></i>
+                                    <span id="formTitle">Register New Student</span>
+                                </h2>
+                                <span id="cancelEditBtn" onclick="resetForm()" class="hidden text-xs text-rose-400 hover:underline cursor-pointer font-medium">Cancel Edit</span>
+                            </div>
+
+                            <form id="studentForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                                <input type="hidden" id="editIndex" value="-1">
+                                <div id="studentIdError" class="hidden p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-exclamation"></i>
+                                    <span id="studentIdErrorMsg">Duplicate ID.</span>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Student ID Number</label>
+                                    <input type="text" id="studentId" placeholder="e.g. 2026-00101" required oninput="hideStudentIdError()"
+                                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Full Name</label>
+                                    <input type="text" id="studentName" placeholder="e.g. Juan dela Cruz" required
+                                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">Academic Course</label>
+                                    <select id="studentCourse" required
+                                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white">
+                                        <option value="" disabled selected>Select Course Program</option>
+                                        <option value="BSIT">BS Information Technology</option>
+                                        <option value="BSCS">BS Computer Science</option>
+                                        <option value="BSIS">BS Information Systems</option>
+                                        <option value="BSCpE">BS Computer Engineering</option>
+                                    </select>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">Year Level</label>
+                                        <select id="studentYear" required
+                                            class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white">
+                                            <option value="1st Year">1st Year</option>
+                                            <option value="2nd Year">2nd Year</option>
+                                            <option value="3rd Year">3rd Year</option>
+                                            <option value="4th Year">4th Year</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1">GPA Rating</label>
+                                        <input type="number" id="studentGpa" step="0.01" min="1.00" max="5.00" placeholder="1.25" required
+                                            class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white font-mono">
+                                    </div>
+                                </div>
+                                <p id="approvalNote" class="hidden text-[11px] text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+                                    <i class="fa-solid fa-hourglass-half"></i> New students you add must be approved by an admin before they become official records.
+                                </p>
+                                <button type="submit" id="formSubmitBtn"
+                                    class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs uppercase tracking-wider shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2 mt-2">
+                                    <i class="fa-solid fa-floppy-disk"></i> Save Student Record
+                                </button>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section class="lg:col-span-8 bg-cardDark rounded-2xl shadow-sm border border-slate-800 p-6 flex flex-col justify-between">
+                        <div>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                                <div>
+                                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                        <i class="fa-solid fa-address-book text-amber-500"></i> Student Directory
+                                    </h2>
+                                    <p class="text-xs text-slate-400 mt-0.5">Singly Linked List memory nodes</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <div class="relative">
+                                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                                            <i class="fa-solid fa-search text-xs"></i>
+                                        </span>
+                                        <input type="text" id="searchInput" oninput="renderTable()" placeholder="Search name or ID..."
+                                            class="pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 w-48 sm:w-64">
+                                    </div>
+                                    <select id="filterCourse" onchange="renderTable()"
+                                        class="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500">
+                                        <option value="ALL">All Courses</option>
+                                        <option value="BSIT">BSIT</option>
+                                        <option value="BSCS">BSCS</option>
+                                        <option value="BSIS">BSIS</option>
+                                        <option value="BSCpE">BSCpE</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+                                <table class="w-full text-left text-xs">
+                                    <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+                                        <tr>
+                                            <th class="py-3 px-4">Node / ID</th>
+                                            <th class="py-3 px-4">Student Name</th>
+                                            <th class="py-3 px-4">Course</th>
+                                            <th class="py-3 px-4">Year Level</th>
+                                            <th class="py-3 px-4">GPA</th>
+                                            <th class="admin-only py-3 px-4">Created By</th>
+                                            <th class="py-3 px-4 text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="studentTableBody" class="divide-y divide-slate-800/60">
+
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-4 mt-4 text-[11px] text-slate-400">
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Honors (&le; 1.75)</span>
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Regular (1.76 - 3.00)</span>
+                                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> At Risk (3.01 - 5.00)</span>
+                                <span class="flex items-center gap-1.5"><span class="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-[10px] font-mono">PENDING</span> Waiting for admin approval</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div id="tabContent-approvals" class="hidden space-y-8 animate-fade-in">
+                <div class="bg-cardDark rounded-2xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-user-check text-emerald-400"></i> Pending Student Approvals
+                            </h2>
+                            <p class="text-xs text-slate-400">Students added by users stay here until you approve them. Approved students join the official directory.</p>
+                        </div>
+                        <button onclick="loadPending()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-medium transition">
+                            <i class="fa-solid fa-rotate"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-3 px-4">Student ID</th>
+                                    <th class="py-3 px-4">Name</th>
+                                    <th class="py-3 px-4">Course</th>
+                                    <th class="py-3 px-4">Year Level</th>
+                                    <th class="py-3 px-4">GPA</th>
+                                    <th class="py-3 px-4">Submitted By</th>
+                                    <th class="py-3 px-4 text-center">Decision</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingTableBody" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tabContent-visualizers" class="hidden space-y-8 animate-fade-in">
+                <div class="bg-cardDark rounded-2xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-diagram-project text-purple-400"></i> Singly Linked List Memory Flow
+                            </h2>
+                            <p class="text-xs text-slate-400">Visual mapping of dynamic memory nodes currently allocated in the system.</p>
+                        </div>
+                        <span class="px-2.5 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-xs font-mono font-semibold" id="linkedListHeadBadge">HEAD ➔ NULL</span>
+                    </div>
+                    <div id="linkedListVisualizerContainer" class="p-6 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center gap-6 overflow-x-auto min-h-[140px]">
+
+                    </div>
+                </div>
+            </div>
+
+            <div id="tabContent-accounts" class="hidden space-y-8 animate-fade-in">
+                <div class="bg-cardDark rounded-2xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-user-gear text-amber-500"></i> Manage Accounts
+                            </h2>
+                            <p class="text-xs text-slate-400">Edit a user's email or password, or delete their account.</p>
+                        </div>
+                        <button onclick="loadUsers()" class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-medium transition">
+                            <i class="fa-solid fa-rotate"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-800/80">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-3 px-4">Username</th>
+                                    <th class="py-3 px-4">Email</th>
+                                    <th class="py-3 px-4">Role</th>
+                                    <th class="py-3 px-4 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accountsTableBody" class="divide-y divide-slate-800/60"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-3">Passwords are never shown. Enter a new one in the edit window to reset it. Admin accounts cannot be deleted.</p>
+                </div>
+            </div>
+
+            <div id="tabContent-logs" class="hidden space-y-8 animate-fade-in">
+                <div class="bg-cardDark rounded-2xl p-6 border border-slate-800">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-amber-500"></i> Stack Activity Log (LIFO)
+                            </h2>
+                            <p class="text-xs text-slate-400">Last-In, First-Out audit trail of system transactions and record modifications.</p>
+                        </div>
+                        <button onclick="clearLogs()" class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-medium transition">
+                            <i class="fa-solid fa-trash-can"></i> Clear History Stack
+                        </button>
+                    </div>
+                    <div id="fullLogsContainer" class="space-y-2.5 max-h-[500px] overflow-y-auto pr-2">
+
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="accountModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] hidden items-center justify-center p-4" onclick="if(event.target===this) closeAccountEdit()">
+        <div class="bg-cardDark border border-slate-800 rounded-3xl shadow-2xl max-w-md w-full p-8 glow-effect">
+            <h2 class="text-xl font-bold text-white mb-1">Edit Account</h2>
+            <p class="text-xs text-slate-400 mb-5">Change the email or set a new password.</p>
+
+            <div id="accountError" class="hidden mb-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span id="accountErrorMsg">Error.</span>
+            </div>
+
+            <form id="accountForm" onsubmit="saveAccount(event)" class="space-y-4">
+                <input type="hidden" id="accId">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">Username</label>
+                    <input type="text" id="accUsername" readonly
+                        class="w-full px-3.5 py-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-sm text-slate-500 font-mono cursor-not-allowed">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
+                    <input type="email" id="accEmail" placeholder="user@example.com"
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5">New 4-Digit PIN / Password</label>
+                    <input type="password" id="accPin" maxlength="4" placeholder="Leave blank to keep current" autocomplete="new-password"
+                        class="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:border-amber-500 text-sm text-white font-mono">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeAccountEdit()" class="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold transition">Cancel</button>
+                    <button type="submit" class="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs uppercase tracking-wider transition">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="creatorsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] hidden items-center justify-center p-4 overflow-y-auto" onclick="if(event.target===this) closeCreators()">
+        <div class="relative bg-cardDark border border-slate-800 rounded-3xl shadow-2xl max-w-6xl w-full p-8 glow-effect animate-fade-in my-auto">
+            <button onclick="closeCreators()" class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition" title="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="text-center mb-8">
+                <span class="inline-block px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-full text-[11px] font-mono font-bold tracking-widest">DEVELOPMENT TEAM</span>
+                <h2 class="text-3xl font-extrabold text-white mt-3">Meet the Creators</h2>
+                <p class="text-sm text-slate-400 mt-2 max-w-xl mx-auto">The talented group of students behind the architecture, data structure implementation, and development of the Student File Management System.</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 text-center hover:border-amber-500/40 transition">
+                    <div class="relative w-28 h-28 mx-auto bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-center text-xl font-semibold text-slate-400">
+                        Castro
+                        <img src="CASTRO.JPG" alt="Castro, Chester Ivan" onerror="this.style.display='none'" class="absolute inset-0 w-full h-full object-cover rounded-2xl">
+                        <span class="absolute -bottom-2 -right-2 w-7 h-7 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-xs"><i class="fa-solid fa-code"></i></span>
+                    </div>
+                    <h3 class="text-base font-bold text-white mt-5">Castro, Chester Ivan</h3>
+                    <p class="text-xs font-semibold text-amber-400 mt-1">Lead Developer</p>
+                    <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">Designed core algorithm operations and Singly Linked List dynamic node structure.</p>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 text-center hover:border-amber-500/40 transition">
+                    <div class="relative w-28 h-28 mx-auto bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-center text-base font-semibold text-slate-400">
+                        Dela Cruz
+                        <img src="DELA CRUZ.JPG" alt="Dela Cruz, Janelle" onerror="this.style.display='none'" class="absolute inset-0 w-full h-full object-cover rounded-2xl">
+                        <span class="absolute -bottom-2 -right-2 w-7 h-7 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-xs"><i class="fa-solid fa-file-lines"></i></span>
+                    </div>
+                    <h3 class="text-base font-bold text-white mt-5">Dela Cruz, Janelle</h3>
+                    <p class="text-xs font-semibold text-amber-400 mt-1">Documentation &amp; QA</p>
+                    <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">Managed testing protocols, project documentation, and requirement verification.</p>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 text-center hover:border-amber-500/40 transition">
+                    <div class="relative w-28 h-28 mx-auto bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-center text-sm font-semibold text-slate-400">
+                        Domondon
+                        <img src="DOMONDON.JPG" alt="Domondon, Jhairus Brian" onerror="this.style.display='none'" class="absolute inset-0 w-full h-full object-cover rounded-2xl">
+                        <span class="absolute -bottom-2 -right-2 w-7 h-7 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-xs"><i class="fa-solid fa-gears"></i></span>
+                    </div>
+                    <h3 class="text-base font-bold text-white mt-5">Domondon, Jhairus Brian</h3>
+                    <p class="text-xs font-semibold text-amber-400 mt-1">System Analyst</p>
+                    <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">Implemented stack history logging, authentication flows, and data structure verification.</p>
+                </div>
+
+                <div class="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 text-center hover:border-amber-500/40 transition">
+                    <div class="relative w-28 h-28 mx-auto bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-center text-xl font-semibold text-slate-400">
+                        Ellana
+                        <img src="ELLANA.JPG" alt="Ellana, Jeanelle" onerror="this.style.display='none'" class="absolute inset-0 w-full h-full object-cover rounded-2xl">
+                        <span class="absolute -bottom-2 -right-2 w-7 h-7 bg-amber-500 text-slate-950 rounded-full flex items-center justify-center text-xs"><i class="fa-solid fa-pen-nib"></i></span>
+                    </div>
+                    <h3 class="text-base font-bold text-white mt-5">Ellana, Jeanelle</h3>
+                    <p class="text-xs font-semibold text-amber-400 mt-1">UI/UX Designer</p>
+                    <p class="text-[11px] text-slate-400 mt-3 leading-relaxed">Architected interface layout, responsive visualizers, and interactive dashboard components.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* ================================================================
+       DATABASE VERSION (PHP + MySQL)
+       Files used: login.php, register.php, logout.php, get_students.php,
+       add_student.php, update_student.php, delete_student.php,
+       approvals.php (NEW), auth.php (NEW helper), get_users.php,
+       update_user.php, delete_user.php, get_logs.php, clear_logs.php
+       ================================================================ */
+
+    // "students" = everything the server returned to THIS user:
+    //   admin -> approved students
+    //   user  -> approved students + that user's own PENDING submissions
+    let students = [];
+    let pendingApprovals = [];      // admin only: students waiting for approval
+    let lastPendingCount = 0;
+    let pendingPoll = null;
+
+    let currentRole = null; // 'admin' or 'user'
+    let currentUser = null;
+    let serverLogs = [];
+
+    let activityLogs = [
+        { text: "System initialized. Connecting to database...", time: new Date().toLocaleTimeString(), type: "info" }
+    ];
+
+    let courseChartInstance = null;
+    let gpaChartInstance = null;
+
+    /* ---------- HELPER: call a PHP file with JSON ---------- */
+    async function callApi(file, payload) {
+        const options = payload
+            ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
+            : {};
+        const res = await fetch(file, options);
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch (err) {
+            // PHP returned an error page instead of JSON (e.g. duplicate key)
+            return { success: false, error: "Server error", raw: text };
+        }
+    }
+
+    /* Only OFFICIAL (approved) students count in stats, charts, diagram and exports */
+    function approvedList() {
+        return students.filter(s => (s.status || 'approved') === 'approved');
+    }
+
+    /* ---------- TOAST ---------- */
+    function showToast(msg, type = "info") {
+        const colors = {
+            info:    "border-amber-500/40 text-amber-300",
+            success: "border-emerald-500/40 text-emerald-300",
+            error:   "border-rose-500/40 text-rose-300"
+        };
+        const icons = { info: "fa-circle-info", success: "fa-circle-check", error: "fa-circle-exclamation" };
+        const el = document.createElement('div');
+        el.className = `pointer-events-auto bg-cardDark border ${colors[type] || colors.info} rounded-xl shadow-2xl px-4 py-3 text-xs max-w-xs animate-fade-in flex items-start gap-2`;
+        el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} mt-0.5"></i><span>${escapeHtml(msg)}</span>`;
+        document.getElementById('toastBox').appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 3800);
+        setTimeout(() => el.remove(), 4200);
+    }
+
+    /* ---------- LOAD STUDENTS FROM DATABASE ---------- */
+    async function loadStudents() {
+        try {
+            const data = await callApi("get_students.php");
+            if (Array.isArray(data)) {
+                students = data;
+            } else {
+                students = [];
+                logActivity("Could not load students from database.", "warning");
+            }
+        } catch (err) {
+            students = [];
+            logActivity("Database connection failed. Is Apache/MySQL running?", "warning");
+        }
+        refreshAllData();
+    }
+
+    /* ---------- UI HELPERS ---------- */
+    function showLoginError(msg) {
+        document.getElementById('loginErrorMsg').innerText = msg;
+        const box = document.getElementById('loginError');
+        box.classList.remove('hidden');
+        const card = document.getElementById('loginCard');
+        card.classList.remove('animate-shake');
+        void card.offsetWidth;
+        card.classList.add('animate-shake');
+    }
+
+    function hideLoginError() {
+        document.getElementById('loginError').classList.add('hidden');
+    }
+
+    function showRegisterError(msg) {
+        document.getElementById('registerErrorMsg').innerText = msg;
+        document.getElementById('registerError').classList.remove('hidden');
+    }
+
+    function hideRegisterError() {
+        document.getElementById('registerError').classList.add('hidden');
+    }
+
+    function getGpaTier(gpa) {
+        const g = parseFloat(gpa);
+        if (g <= 1.75) return { label: "Honors", text: "text-emerald-400" };
+        if (g <= 3.00) return { label: "Regular", text: "text-blue-400" };
+        return { label: "At Risk", text: "text-rose-400" };
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    /* ---------- LAMP ANIMATION + PARTICLES ---------- */
+    document.addEventListener("DOMContentLoaded", () => {
+        gsap.registerPlugin(Draggable);
+
+        const body = document.body;
+        const card = document.getElementById("loginCard");
+        const elasticCord = document.getElementById("elasticCord");
+        const cordBead = document.getElementById("cordBead");
+        const cordHit = document.getElementById("cordHit");
+
+        let isOn = false;
+
+        const ANCHOR_X = 160;
+        const ANCHOR_Y = 190;
+        const REST_X = 160;
+        const REST_Y = 290;
+        const MAX_STRETCH = 110;
+        const TRIGGER_PULL = 30;
+
+        gsap.set(cordBead, { x: 0, y: 0 });
+
+        function renderElasticString(curX, curY) {
+            const midX = ANCHOR_X + (curX - ANCHOR_X) * 0.5;
+            const midY = (ANCHOR_Y + curY) / 2;
+            elasticCord.setAttribute("d", `M ${ANCHOR_X} ${ANCHOR_Y} Q ${midX} ${midY} ${curX} ${curY}`);
+        }
+
+        Draggable.create(cordHit, {
+            type: "x,y",
+            edgeResistance: 0.65,
+            bounds: { minY: 0, maxY: MAX_STRETCH, minX: -40, maxX: 40 },
+            trigger: cordHit,
+            cursor: "grab",
+            activeCursor: "grabbing",
+            onDrag: function() {
+                const bx = REST_X + this.x;
+                const by = REST_Y + this.y;
+                gsap.set(cordBead, { x: this.x, y: this.y });
+                renderElasticString(bx, by);
+            },
+            onRelease: function() {
+                handleElasticRelease(REST_X + this.x, REST_Y + this.y);
+            }
+        });
+
+        function handleElasticRelease(curX, curY) {
+            const pullDist = curY - REST_Y;
+
+            if (pullDist >= TRIGGER_PULL) {
+                toggleLamp();
+            }
+
+            gsap.to([cordBead, cordHit], {
+                x: 0,
+                y: 0,
+                duration: 1,
+                ease: "elastic.out(1, 0.2)",
+                onUpdate: function() {
+                    const bx = REST_X + gsap.getProperty(cordBead, "x");
+                    const by = REST_Y + gsap.getProperty(cordBead, "y");
+                    renderElasticString(bx, by);
+                }
+            });
+        }
+
+        function toggleLamp() {
+            isOn = !isOn;
+            body.setAttribute("data-on", isOn ? "true" : "false");
+
+            const filament = document.querySelector(".bulb-filament");
+            const bulbGlow = document.querySelector(".bulb-glow-core");
+
+            if (isOn) {
+                gsap.to(filament, { stroke: "#fff", duration: 0.05 });
+                gsap.to(bulbGlow, { opacity: 0.9, duration: 0.1, ease: "power2.out" });
+                gsap.fromTo(card, 
+                    { y: 30, opacity: 0, pointerEvents: "none" }, 
+                    { y: 0, opacity: 1, pointerEvents: "auto", duration: 0.5, ease: "power2.out", delay: 0.1 }
+                );
+            } else {
+                gsap.to(bulbGlow, { opacity: 0, duration: 0.05 });
+                gsap.set(filament, { stroke: "#555" });
+                gsap.to(card, { y: 15, opacity: 0, pointerEvents: "none", duration: 0.2, ease: "power2.in" });
+            }
+        }
+
+        const canvas = document.getElementById("dustCanvas");
+        const ctx = canvas.getContext("2d");
+        let width, height;
+        let particles = [];
+        const PARTICLE_COUNT = 50;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.radius = Math.random() * 2 + 0.5;
+                this.vx = (Math.random() - 0.5) * 0.4;
+                this.vy = -Math.random() * 0.5 - 0.2;
+                this.alpha = Math.random() * 0.5 + 0.1;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.y < 0) this.y = height;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+            }
+            draw() {
+                const factor = isOn ? 1 : 0.3;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 205, 120, ${this.alpha * factor})`;
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < PARTICLE_COUNT; i++) { particles.push(new Particle()); }
+
+        function renderParticles() {
+            ctx.clearRect(0, 0, width, height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+            }
+            requestAnimationFrame(renderParticles);
+        }
+        renderParticles();
+
+        refreshAllData();
+    });
+
+    /* ---------- TABS ---------- */
+    function switchTab(tabId) {
+        ['dashboard', 'records', 'approvals', 'visualizers', 'logs', 'accounts'].forEach(t => {
+            document.getElementById(`tabContent-${t}`).classList.add('hidden');
+            const btn = document.getElementById(`tabBtn-${t}`);
+            btn.className = "px-4 py-2 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-2";
+        });
+
+        document.getElementById(`tabContent-${tabId}`).classList.remove('hidden');
+        const activeBtn = document.getElementById(`tabBtn-${tabId}`);
+        activeBtn.className = "px-4 py-2 rounded-lg text-slate-950 bg-amber-500 font-semibold transition flex items-center gap-2 shadow-sm";
+
+        if (tabId === 'dashboard') updateCharts();
+        if (tabId === 'visualizers') renderLinkedListVisualizer();
+        if (tabId === 'accounts') loadUsers();
+        if (tabId === 'approvals') loadPending();
+        if (tabId === 'logs') { if (currentRole === 'admin') loadServerLogs(); else renderFullLogs(); }
+    }
+
+    function toggleAuthView(view) {
+        hideLoginError();
+        hideRegisterError();
+        if (view === 'register') {
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('registerModal').classList.remove('hidden');
+        } else {
+            document.getElementById('registerModal').classList.add('hidden');
+            document.getElementById('loginModal').classList.remove('hidden');
+        }
+    }
+
+    /* ---------- AUTHENTICATION (DATABASE) ---------- */
+    async function handleLogin(e) {
+        e.preventDefault();
+        const username = document.getElementById('usernameInput').value.trim();
+        const pin = document.getElementById('pinInput').value.trim();
+
+        let data;
+        try {
+            data = await callApi("login.php", { username, pin });
+        } catch (err) {
+            showLoginError("Cannot reach the server. Is Apache running?");
+            return;
+        }
+
+        // Wrong username/password: show error and DO NOT open the dashboard
+        if (!data.success) {
+            showLoginError("Invalid username or password. Access Denied.");
+            document.getElementById('pinInput').value = "";
+            document.getElementById('pinInput').focus();
+            return;
+        }
+
+        hideLoginError();
+        document.getElementById('loginForm').reset();
+        document.getElementById('loginModal').classList.add('hidden');
+        currentRole = data.role || 'user';
+        currentUser = data.username || username;
+        applyRoleUI();
+        document.getElementById('mainDashboard').classList.remove('hidden');
+        logActivity(`${currentRole === 'admin' ? 'Admin' : 'User'} '${currentUser}' successfully authenticated into system.`, "success");
+        switchTab('dashboard');
+        await loadStudents();
+        updateCharts();
+
+        if (currentRole === 'admin') {
+            lastPendingCount = 0;
+            await loadPending(true);
+            startPendingPoll();
+        }
+    }
+
+    async function handleRegister(e) {
+        e.preventDefault();
+        const username = document.getElementById('regUsername').value.trim();
+        const email = document.getElementById('regEmail').value.trim();
+        const pin = document.getElementById('regPin').value.trim();
+
+        if (username.length < 3) {
+            showRegisterError("Username must be at least 3 characters.");
+            return;
+        }
+        if (!/^\d{4}$/.test(pin)) {
+            showRegisterError("PIN must be exactly 4 digits.");
+            return;
+        }
+
+        let data;
+        try {
+            data = await callApi("register.php", { username, email, pin });
+        } catch (err) {
+            showRegisterError("Cannot reach the server. Is Apache running?");
+            return;
+        }
+
+        if (!data.success) {
+            showRegisterError(data.error || "That username or email is already taken.");
+            return;
+        }
+
+        document.getElementById('registerForm').reset();
+        hideRegisterError();
+        alert("Account created successfully! You can now sign in.");
+        toggleAuthView('login');
+    }
+
+    function handleLogout() {
+        callApi("logout.php", {}).catch(() => {});
+        stopPendingPoll();
+        currentRole = null;
+        currentUser = null;
+        students = [];
+        pendingApprovals = [];
+        serverLogs = [];
+        updatePendingBadge();
+        document.getElementById('mainDashboard').classList.add('hidden');
+        document.getElementById('loginModal').classList.remove('hidden');
+        document.getElementById('loginForm').reset();
+        hideLoginError();
+        logActivity("User logged out of the system.", "warning");
+    }
+
+    /* ---------- STUDENT CRUD (DATABASE) ---------- */
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        const index = parseInt(document.getElementById('editIndex').value);
+        const enteredId = document.getElementById('studentId').value.trim();
+
+        // Block duplicate Student ID (ignore the record currently being edited)
+        const duplicate = students.some((s, i) =>
+            i !== index && s.id.trim().toLowerCase() === enteredId.toLowerCase()
+        );
+        if (duplicate) {
+            showStudentIdError(`Student ID "${enteredId}" already exists. Please use a different ID number.`);
+            document.getElementById('studentId').focus();
+            return;
+        }
+        hideStudentIdError();
+
+        const record = {
+            id: enteredId,
+            name: document.getElementById('studentName').value.trim(),
+            course: document.getElementById('studentCourse').value,
+            year: document.getElementById('studentYear').value,
+            gpa: parseFloat(document.getElementById('studentGpa').value).toFixed(2)
+        };
+
+        const isEdit = index !== -1;
+        const file = isEdit ? "update_student.php" : "add_student.php";
+        if (isEdit) record.oldId = students[index].id;
+
+        let data;
+        try {
+            data = await callApi(file, record);
+        } catch (err) {
+            showStudentIdError("Cannot reach the server. Is Apache running?");
+            return;
+        }
+
+        if (!data.success) {
+            showStudentIdError(data.error && data.error !== "Server error"
+                ? data.error
+                : `Could not save. Student ID "${enteredId}" may already exist in the database.`);
+            return;
+        }
+
+        if (isEdit) {
+            logActivity(`Updated student record: ${record.name} (${record.id})`, "info");
+            showToast("Student record updated.", "success");
+        } else if (data.status === 'pending') {
+            logActivity(`Submitted student for approval: ${record.name} (${record.id})`, "info");
+            showToast(data.message || "Submitted. Waiting for admin approval.", "info");
+        } else {
+            logActivity(`Added new student record: ${record.name} (${record.id})`, "success");
+            showToast("Student added.", "success");
+        }
+
+        resetForm();
+        await loadStudents();
+    }
+
+    function showStudentIdError(msg) {
+        document.getElementById('studentIdErrorMsg').innerText = msg;
+        document.getElementById('studentIdError').classList.remove('hidden');
+    }
+
+    function hideStudentIdError() {
+        document.getElementById('studentIdError').classList.add('hidden');
+    }
+
+    function editStudent(index) {
+        hideStudentIdError();
+        const s = students[index];
+        document.getElementById('studentId').value = s.id;
+        document.getElementById('studentName').value = s.name;
+        document.getElementById('studentCourse').value = s.course;
+        document.getElementById('studentYear').value = s.year;
+        document.getElementById('studentGpa').value = s.gpa;
+        document.getElementById('editIndex').value = index;
+        document.getElementById('formTitle').innerText = "Edit Student Record";
+        document.getElementById('cancelEditBtn').classList.remove('hidden');
+        document.getElementById('formSubmitBtn').innerHTML = `<i class="fa-solid fa-pen-to-square"></i> Update Record`;
+    }
+
+    async function deleteStudent(index) {
+        const s = students[index];
+        if (!s) return;
+        if (!confirm(`Delete ${s.name} (${s.id})?`)) return;
+
+        try {
+            await callApi("delete_student.php", { id: s.id, name: s.name });
+        } catch (err) {
+            logActivity("Delete failed. Cannot reach the server.", "warning");
+            return;
+        }
+        logActivity(`Deleted student record: ${s.name} (${s.id})`, "rose");
+        await loadStudents();
+    }
+
+    function resetForm() {
+        hideStudentIdError();
+        document.getElementById('studentForm').reset();
+        document.getElementById('editIndex').value = "-1";
+        document.getElementById('formTitle').innerText = "Register New Student";
+        document.getElementById('cancelEditBtn').classList.add('hidden');
+        document.getElementById('formSubmitBtn').innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Save Student Record`;
+    }
+
+    /* ---------- ADMIN APPROVALS ---------- */
+    function startPendingPoll() {
+        stopPendingPoll();
+        pendingPoll = setInterval(() => loadPending(true), 20000);
+    }
+
+    function stopPendingPoll() {
+        if (pendingPoll) { clearInterval(pendingPoll); pendingPoll = null; }
+    }
+
+    async function loadPending(silent = false) {
+        if (currentRole !== 'admin') return;
+        let data;
+        try {
+            data = await callApi("approvals.php", { action: "list" });
+        } catch (err) {
+            data = [];
+        }
+        pendingApprovals = Array.isArray(data) ? data : [];
+
+        if (silent && pendingApprovals.length > lastPendingCount && lastPendingCount !== -1) {
+            const diff = pendingApprovals.length - lastPendingCount;
+            showToast(`${diff} new student${diff > 1 ? 's' : ''} waiting for your approval.`, "info");
+        }
+        lastPendingCount = pendingApprovals.length;
+
+        updatePendingBadge();
+        renderPending();
+    }
+
+    function updatePendingBadge() {
+        const badge = document.getElementById('pendingBadge');
+        const n = pendingApprovals.length;
+        badge.innerText = n;
+        badge.classList.toggle('hidden', n === 0);
+    }
+
+    function renderPending() {
+        const tbody = document.getElementById('pendingTableBody');
+        if (pendingApprovals.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500 font-mono">No students waiting for approval.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = pendingApprovals.map(s => {
+            const tier = getGpaTier(s.gpa);
+            return `
+                <tr class="hover:bg-slate-900/60 transition">
+                    <td class="py-3 px-4 font-mono text-amber-400 font-semibold">${escapeHtml(s.id)}</td>
+                    <td class="py-3 px-4 font-medium text-white">${escapeHtml(s.name)}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 bg-slate-800 rounded text-[11px] font-mono text-slate-300">${escapeHtml(s.course)}</span></td>
+                    <td class="py-3 px-4 text-slate-400">${escapeHtml(s.year)}</td>
+                    <td class="py-3 px-4 font-mono font-semibold ${tier.text}">${escapeHtml(s.gpa)}</td>
+                    <td class="py-3 px-4 text-slate-300 font-mono">${escapeHtml(s.created_by || '')}</td>
+                    <td class="py-3 px-4 text-center whitespace-nowrap">
+                        <button onclick="decidePending('approve', '${escapeHtml(s.id)}')" class="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-[11px] font-semibold transition mr-1"><i class="fa-solid fa-check"></i> Approve</button>
+                        <button onclick="decidePending('reject', '${escapeHtml(s.id)}')" class="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-[11px] font-semibold transition"><i class="fa-solid fa-xmark"></i> Reject</button>
+                    </td>
+                </tr>`;
+        }).join('');
+    }
+
+    async function decidePending(action, id) {
+        const s = pendingApprovals.find(p => p.id === id);
+        const label = s ? `${s.name} (${s.id})` : id;
+        if (action === 'reject' && !confirm(`Reject ${label}? The student will not be added.`)) return;
+
+        let data;
+        try {
+            data = await callApi("approvals.php", { action, id });
+        } catch (err) {
+            showToast("Cannot reach the server.", "error");
+            return;
+        }
+        if (!data.success) {
+            showToast("Could not update. It may already be handled.", "error");
+            await loadPending();
+            return;
+        }
+
+        if (action === 'approve') {
+            logActivity(`Approved student: ${label}`, "success");
+            showToast(`${label} approved and added to the directory.`, "success");
+        } else {
+            logActivity(`Rejected student: ${label}`, "rose");
+            showToast(`${label} rejected.`, "info");
+        }
+        await loadPending();
+        await loadStudents();
+    }
+
+    /* ---------- RENDERING ---------- */
+    function refreshAllData() {
+        renderTable();
+        updateDashboardMetrics();
+        renderRecentLogs();
+        if (!document.getElementById('tabContent-visualizers').classList.contains('hidden')) {
+            renderLinkedListVisualizer();
+        }
+        if (!document.getElementById('tabContent-dashboard').classList.contains('hidden')) {
+            updateCharts();
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('studentTableBody');
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const filter = document.getElementById('filterCourse').value;
+
+        tbody.innerHTML = '';
+        let filtered = students.filter(s => {
+            const matchesSearch = s.name.toLowerCase().includes(search) || s.id.toLowerCase().includes(search);
+            const matchesFilter = filter === 'ALL' || s.course === filter;
+            return matchesSearch && matchesFilter;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500 font-mono">No matching records found in Linked List.</td></tr>`;
+            return;
+        }
+
+        filtered.forEach((s, idx) => {
+            const realIdx = students.indexOf(s);
+            const tier = getGpaTier(s.gpa);
+            const isPending = s.status === 'pending';
+            const pendingTag = isPending
+                ? `<span class="ml-2 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-[10px] font-mono">PENDING</span>`
+                : '';
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-900/60 transition border-b border-slate-800/40 ${isPending ? 'opacity-80' : ''}">
+                    <td class="py-3 px-4 font-mono text-amber-400 font-semibold">Node[${idx}]<br><span class="text-[10px] text-slate-500">${escapeHtml(s.id)}</span></td>
+                    <td class="py-3 px-4 font-medium text-white">${escapeHtml(s.name)}${pendingTag}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 bg-slate-800 rounded text-[11px] font-mono text-slate-300">${escapeHtml(s.course)}</span></td>
+                    <td class="py-3 px-4 text-slate-400">${escapeHtml(s.year)}</td>
+                    <td class="py-3 px-4 font-mono font-semibold ${tier.text}" title="${tier.label}">${escapeHtml(s.gpa)}</td>
+                    ${currentRole === 'admin' ? `<td class="py-3 px-4 text-slate-400 font-mono">${escapeHtml(s.created_by || '')}</td>` : ''}
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="editStudent(${realIdx})" class="p-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-lg mr-1 transition" title="Edit"><i class="fa-solid fa-pen text-xs"></i></button>
+                        ${currentRole === 'admin' ? `<button onclick="deleteStudent(${realIdx})" class="p-1.5 bg-slate-900 hover:bg-slate-800 text-rose-400 rounded-lg transition" title="Delete"><i class="fa-solid fa-trash text-xs"></i></button>` : ''}
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function updateDashboardMetrics() {
+        const list = approvedList();
+        document.getElementById('dashTotalStudents').innerText = list.length;
+        const courses = [...new Set(list.map(s => s.course))];
+        document.getElementById('dashTotalCourses').innerText = courses.length;
+
+        if (list.length > 0) {
+            const avg = list.reduce((acc, s) => acc + parseFloat(s.gpa), 0) / list.length;
+            document.getElementById('dashAvgGPA').innerText = avg.toFixed(2);
+
+            const honors = list.filter(s => parseFloat(s.gpa) <= 1.75).length;
+            document.getElementById('dashHonorStudents').innerText = honors;
+        } else {
+            document.getElementById('dashAvgGPA').innerText = "0.00";
+            document.getElementById('dashHonorStudents').innerText = "0";
+        }
+    }
+
+    function renderLinkedListVisualizer() {
+        const container = document.getElementById('linkedListVisualizerContainer');
+        container.innerHTML = '';
+        const list = approvedList();
+
+        if (list.length === 0) {
+            container.innerHTML = `<p class="text-xs text-slate-500 font-mono">Linked list is empty (HEAD ➔ NULL).</p>`;
+            document.getElementById('linkedListHeadBadge').innerText = "HEAD ➔ NULL";
+            return;
+        }
+
+        document.getElementById('linkedListHeadBadge').innerText = `HEAD ➔ Node [0] (${list[0].id})`;
+
+        list.forEach((s, i) => {
+            const isLast = i === list.length - 1;
+            const tier = getGpaTier(s.gpa);
+            container.innerHTML += `
+                <div class="flex items-center gap-4 flex-shrink-0 animate-fade-in">
+                    <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-4 w-52 shadow-lg relative">
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                            <span class="text-[10px] font-mono text-amber-400 uppercase">Node Address #${i}</span>
+                            <span class="text-[10px] font-mono text-slate-500">${i === 0 ? 'HEAD' : 'next'}</span>
+                        </div>
+                        <p class="text-xs font-bold text-white truncate">${escapeHtml(s.name)}</p>
+                        <p class="text-[11px] text-slate-400 font-mono">${escapeHtml(s.id)} | ${escapeHtml(s.course)}</p>
+                        <p class="text-[11px] font-mono ${tier.text} mt-1">GPA: ${escapeHtml(s.gpa)}</p>
+                    </div>
+                    <div class="text-slate-600 font-bold font-mono text-lg">
+                        ${isLast ? 'NULL ⬛' : '➔'}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    /* ---------- ACCOUNT MANAGEMENT (ADMIN) ---------- */
+    let accounts = [];
+
+    async function loadUsers() {
+        try {
+            const data = await callApi("get_users.php");
+            accounts = Array.isArray(data) ? data : [];
+        } catch (err) {
+            accounts = [];
+        }
+        renderAccounts();
+    }
+
+    function renderAccounts() {
+        const tbody = document.getElementById('accountsTableBody');
+        if (accounts.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="py-6 text-center text-slate-500 font-mono">No accounts found.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = accounts.map(u => {
+            const isAdminAcc = u.role === 'admin';
+            const roleCls = isAdminAcc ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400';
+            return `
+                <tr class="hover:bg-slate-900/60 transition">
+                    <td class="py-3 px-4 font-mono text-amber-400 font-semibold">${escapeHtml(u.username)}</td>
+                    <td class="py-3 px-4 text-slate-300">${u.email ? escapeHtml(u.email) : '<span class="text-slate-600">no email</span>'}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[11px] font-mono ${roleCls}">${escapeHtml(u.role)}</span></td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="openAccountEdit(${Number(u.id)})" class="p-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-lg mr-1 transition" title="Edit email / password"><i class="fa-solid fa-pen text-xs"></i></button>
+                        ${isAdminAcc ? '' : `<button onclick="deleteAccount(${Number(u.id)})" class="p-1.5 bg-slate-900 hover:bg-slate-800 text-rose-400 rounded-lg transition" title="Delete account"><i class="fa-solid fa-trash text-xs"></i></button>`}
+                    </td>
+                </tr>`;
+        }).join('');
+    }
+
+    function openAccountEdit(id) {
+        const u = accounts.find(a => Number(a.id) === Number(id));
+        if (!u) return;
+        document.getElementById('accountError').classList.add('hidden');
+        document.getElementById('accId').value = u.id;
+        document.getElementById('accUsername').value = u.username;
+        document.getElementById('accEmail').value = u.email || '';
+        document.getElementById('accPin').value = '';
+        const m = document.getElementById('accountModal');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+    }
+
+    function closeAccountEdit() {
+        const m = document.getElementById('accountModal');
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    }
+
+    async function saveAccount(e) {
+        e.preventDefault();
+        const id = document.getElementById('accId').value;
+        const username = document.getElementById('accUsername').value;
+        const email = document.getElementById('accEmail').value.trim();
+        const pin = document.getElementById('accPin').value.trim();
+
+        const showErr = (msg) => {
+            document.getElementById('accountErrorMsg').innerText = msg;
+            document.getElementById('accountError').classList.remove('hidden');
+        };
+
+        if (pin !== '' && !/^\d{4}$/.test(pin)) {
+            showErr("PIN must be exactly 4 digits.");
+            return;
+        }
+
+        let data;
+        try {
+            data = await callApi("update_user.php", { id, email, pin });
+        } catch (err) {
+            showErr("Cannot reach the server.");
+            return;
+        }
+        if (!data.success) {
+            showErr(data.error || "Could not update the account.");
+            return;
+        }
+        closeAccountEdit();
+        logActivity(`Updated account '${username}'${pin ? ' (password reset)' : ''}.`, "info");
+        await loadUsers();
+    }
+
+    async function deleteAccount(id) {
+        const u = accounts.find(a => Number(a.id) === Number(id));
+        if (!u) return;
+        if (!confirm(`Delete the account '${u.username}'? They will no longer be able to log in.`)) return;
+
+        let data;
+        try {
+            data = await callApi("delete_user.php", { id });
+        } catch (err) {
+            alert("Cannot reach the server.");
+            return;
+        }
+        if (!data.success) {
+            alert(data.error || "Could not delete the account.");
+            return;
+        }
+        logActivity(`Deleted account '${u.username}'.`, "rose");
+        await loadUsers();
+    }
+
+    /* ---------- ROLE-BASED UI ---------- */
+    function applyRoleUI() {
+        const isAdmin = currentRole === 'admin';
+        document.querySelectorAll('.admin-only').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
+        ['tabBtn-approvals', 'tabBtn-visualizers', 'tabBtn-logs', 'tabBtn-accounts'].forEach(id => {
+            document.getElementById(id).style.display = isAdmin ? '' : 'none';
+        });
+        // Users are told that new students need admin approval
+        document.getElementById('approvalNote').classList.toggle('hidden', isAdmin);
+
+        const badge = document.getElementById('roleBadge');
+        badge.innerText = `${currentUser} \u00b7 ${isAdmin ? 'ADMIN' : 'USER'}`;
+        badge.style.color = isAdmin ? '#fbbf24' : '#34d399';
+    }
+
+    /* ---------- ACTIVITY LOG STACK (LIFO) ---------- */
+    function logActivity(text, type = "info") {
+        activityLogs.unshift({ text, time: new Date().toLocaleTimeString(), type });
+        if (activityLogs.length > 50) activityLogs.pop();
+        renderRecentLogs();
+    }
+
+    function renderRecentLogs() {
+        const container = document.getElementById('dashRecentLogs');
+        container.innerHTML = '';
+        activityLogs.slice(0, 4).forEach(log => {
+            container.innerHTML += `
+                <div class="p-2.5 bg-slate-900/60 rounded-xl border border-slate-800/60 text-xs flex items-center justify-between">
+                    <span class="text-slate-300"><i class="fa-solid fa-circle text-[6px] text-amber-500 mr-2"></i>${escapeHtml(log.text)}</span>
+                    <span class="text-[10px] text-slate-500 font-mono">${log.time}</span>
+                </div>
+            `;
+        });
+    }
+
+    async function loadServerLogs() {
+        try {
+            const data = await callApi("get_logs.php");
+            serverLogs = Array.isArray(data) ? data : [];
+        } catch (err) {
+            serverLogs = [];
+        }
+        renderFullLogs();
+    }
+
+    function renderFullLogs() {
+        const container = document.getElementById('fullLogsContainer');
+
+        if (currentRole === 'admin') {
+            if (serverLogs.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 font-mono">No activity recorded yet.</p>`;
+                return;
+            }
+            container.innerHTML = serverLogs.map((log, idx) => {
+                const who = log.role === 'admin' ? 'text-amber-400' : 'text-emerald-400';
+                return `
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-mono text-slate-500">Stack[${idx}]</span>
+                        <span class="font-mono font-semibold ${who}">${escapeHtml(log.username)} <span class="text-[10px] text-slate-500">(${escapeHtml(log.role)})</span></span>
+                        <span class="text-slate-200">${escapeHtml(log.action)}</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-mono whitespace-nowrap">${escapeHtml(log.created_at)}</span>
+                </div>`;
+            }).join('');
+            return;
+        }
+
+        container.innerHTML = '';
+        activityLogs.forEach((log, idx) => {
+            container.innerHTML += `
+                <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 text-xs flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] font-mono text-slate-500">Stack[${idx}]</span>
+                        <span class="text-slate-200">${escapeHtml(log.text)}</span>
+                    </div>
+                    <span class="text-[10px] text-slate-400 font-mono">${log.time}</span>
+                </div>
+            `;
+        });
+    }
+
+    async function clearLogs() {
+        if (currentRole === 'admin') {
+            if (!confirm("Clear the entire activity history from the database?")) return;
+            await callApi("clear_logs.php", {});
+            await loadServerLogs();
+            return;
+        }
+        activityLogs = [];
+        renderFullLogs();
+        renderRecentLogs();
+    }
+
+    /* ---------- CHARTS ---------- */
+    function updateCharts() {
+        const list = approvedList();
+        const courseCounts = { BSIT: 0, BSCS: 0, BSIS: 0, BSCpE: 0 };
+        list.forEach(s => { if (courseCounts[s.course] !== undefined) courseCounts[s.course]++; });
+
+        const gpaTiers = { "Honors (<= 1.75)": 0, "Regular (1.76 - 3.00)": 0, "At Risk (3.01 - 5.00)": 0 };
+        list.forEach(s => {
+            const g = parseFloat(s.gpa);
+            if (g <= 1.75) gpaTiers["Honors (<= 1.75)"]++;
+            else if (g <= 3.00) gpaTiers["Regular (1.76 - 3.00)"]++;
+            else gpaTiers["At Risk (3.01 - 5.00)"]++;
+        });
+
+        const ctx1 = document.getElementById('courseChart').getContext('2d');
+        if (courseChartInstance) courseChartInstance.destroy();
+        courseChartInstance = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: Object.keys(courseCounts),
+                datasets: [{
+                    label: 'Enrolled Students',
+                    data: Object.values(courseCounts),
+                    backgroundColor: '#f59e0b',
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                    y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', stepSize: 1 } }
+                }
+            }
+        });
+
+        const ctx2 = document.getElementById('gpaChart').getContext('2d');
+        if (gpaChartInstance) gpaChartInstance.destroy();
+        gpaChartInstance = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(gpaTiers),
+                datasets: [{
+                    data: Object.values(gpaTiers),
+                    backgroundColor: ['#10b981', '#3b82f6', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    /* ---------- EXPORT (approved students only) ---------- */
+    function exportCSV() {
+        let csv = "ID,Name,Course,Year,GPA,Created By\n";
+        approvedList().forEach(s => {
+            csv += `${s.id},"${s.name}",${s.course},${s.year},${s.gpa},${s.created_by || ''}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'student_records.csv';
+        a.click();
+        logActivity("Exported database records to CSV format.", "success");
+    }
+
+    function exportJSON() {
+        const json = JSON.stringify(approvedList(), null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'student_records.json';
+        a.click();
+        logActivity("Exported database records to JSON format.", "success");
+    }
+
+    /* ---------- MODALS / FOCUS ---------- */
+    function openCreators() {
+        const m = document.getElementById('creatorsModal');
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+    }
+    function closeCreators() {
+        const m = document.getElementById('creatorsModal');
+        m.classList.add('hidden');
+        m.classList.remove('flex');
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeCreators();
+    });
+
+    function focusAddForm() {
+        document.getElementById('studentId').focus();
+    }
+    function focusSearch() {
+        document.getElementById('searchInput').focus();
+    }
+    </script>
+</body>
+</html>
